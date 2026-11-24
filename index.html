@@ -187,6 +187,7 @@ h2{font-size:23px;line-height:1.2;color:var(--teal);font-weight:800;letter-spaci
 
 <script>
 var BOT = 'collagenby_bot';            // ← username бота без @
+var BH_START = 'c1795514778131-ds';         // ← код запуска воронки BotHelp (из ссылки Bro)
 var LEAD_WEBHOOK = '';                       // ← URL вебхука CRM/бота для заявки «перезвоните» (необязательно)
 
 // ВАРИАНТЫ ШАПКИ для A/B-теста. Принудительно: ?h=a / ?h=b / ?h=c / ?h=d / ?h=e
@@ -282,12 +283,14 @@ function result(){
   if(ans.start!=='t') l.push('Хотите со вкусом? Банка 500 г (вишня, малина, яблоко и др.) — 170 BYN, хватает на 1,5 месяца');
   document.getElementById('r-list').innerHTML = l.map(function(x){return '<li>'+x+'</li>'}).join('');
 
-  // payload для бота (BotHelp ветвится по «start содержит» k1_ / k500_ / zn_):
+  // код для бота (BotHelp ветвится по «campaign_code содержит» k1_ / k500_ / zn_):
   // f → k1_<src> (курс 1 кг), t → k500_<src> (банка 500 г),
   // x → только <src>: кода нет, бот сам задаст 2 вопроса
   var CODE = {f:'k1_', t:'k500_'};
   var payload = (CODE[ans.start] || '') + src;
-  document.getElementById('tg').href = 'https://t.me/' + BOT + '?start=' + payload;
+  // BotHelp запускает воронку только по своей ссылке: start = системный код,
+  // наш код уходит в поле подписчика campaign_code
+  document.getElementById('tg').href = 'https://r.bothelp.io/tg?domain=' + BOT + '&start=' + BH_START + '&campaign_code=' + payload;
 }
 
 document.getElementById('tg').addEventListener('click', function(){ track('tg_click'); });
