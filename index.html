@@ -6,6 +6,40 @@
 <meta name="color-scheme" content="light only">
 <title>Подбор курса коллагена</title>
 <meta name="description" content="4 вопроса — и ваш план курса «Первый Живой Коллаген» придёт в Telegram">
+<!-- Подтверждение домена в Meta: вставьте сюда строку из Business Manager, например
+<meta name="facebook-domain-verification" content="XXXXXXXX"> -->
+<script>
+/* ===== НАСТРОЙКИ ИНТЕГРАЦИЙ — заполнить перед запуском ===== */
+var PIXEL_ID   = '';   // ← ID пикселя Meta (15–16 цифр). Пусто = пиксель выключен
+var WORKER_URL = '';   // ← адрес Cloudflare Worker, который передаёт заявки в Битрикс24
+/* ============================================================ */
+
+// UTM-метки: запоминаем при первом заходе с метками и храним 30 дней
+var UTM = (function(){
+  var keys = ['utm_source','utm_medium','utm_campaign','utm_content','utm_term','fbclid','src'];
+  var q = new URLSearchParams(location.search), now = {}, has = false, saved = null;
+  keys.forEach(function(k){ var v = q.get(k); if(v){ now[k] = v.slice(0,200); has = true; } });
+  try{ saved = JSON.parse(localStorage.getItem('cb_utm')||'null'); }catch(e){}
+  if(has){ now._t = Date.now(); try{ localStorage.setItem('cb_utm', JSON.stringify(now)); }catch(e){} return now; }
+  if(saved && Date.now() - (saved._t||0) < 30*864e5) return saved;
+  return {};
+})();
+
+// Meta Pixel (стандартный код, загружается только если указан PIXEL_ID)
+if(PIXEL_ID){
+  !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+  n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;
+  n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;
+  t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,
+  document,'script','https://connect.facebook.net/en_US/fbevents.js');
+  fbq('init', PIXEL_ID);
+  fbq('track', 'PageView');
+}
+// стандартное событие Meta; eventID пригодится для дедупликации, если позже добавим Conversions API
+function px(name, params){
+  try{ if(window.fbq) fbq('track', name, params||{}, {eventID: name + '-' + Date.now() + '-' + Math.random().toString(36).slice(2,8)}); }catch(e){}
+}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -74,7 +108,13 @@ h2{font-size:23px;line-height:1.2;color:var(--teal);font-weight:800;letter-spaci
 .phone-form.on{display:grid}
 .phone-form input{width:100%;border:2px solid var(--line);border-radius:12px;padding:15px 14px;font:600 16px 'Manrope',Arial,sans-serif;background:var(--card);color:var(--ink)}
 .phone-form input:focus{outline:none;border-color:var(--teal)}
-.phone-form label{font-size:12.5px;color:var(--muted);display:flex;gap:8px;align-items:flex-start}
+.phone-form label{font-size:12.5px;color:var(--muted);display:flex;gap:8px;align-items:flex-start;line-height:1.4}
+.phone-form label input{width:18px;height:18px;flex:none;margin-top:1px;accent-color:var(--tg)}
+.phone-form label a{color:var(--teal-2)}
+.phone-form .hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+.phone-form input.bad{border-color:#d9534f}
+.err{display:none;color:#b3261e;font-size:13px;font-weight:600;text-align:center}
+.legal a{color:var(--muted)}
 .ok{display:none;background:var(--teal-soft);border-radius:12px;padding:14px;font-weight:600;color:var(--teal);text-align:center;margin-top:10px}
 .legal{color:var(--muted);font-size:11.5px;line-height:1.45;text-align:center;margin-top:18px}
 </style>
@@ -175,20 +215,23 @@ h2{font-size:23px;line-height:1.2;color:var(--teal);font-weight:800;letter-spaci
     <div class="alt">
       <button type="button" id="show-phone">Перезвоните мне</button>
     </div>
-    <form class="phone-form" id="phone-form">
-      <input type="tel" id="phone" placeholder="+375 (__) ___-__-__" autocomplete="tel" required>
-      <label><input type="checkbox" required checked> Согласна на обработку персональных данных</label>
-      <button class="btn" type="submit">Жду звонка</button>
+    <form class="phone-form" id="phone-form" novalidate>
+      <input type="text" id="name" placeholder="Как к вам обращаться" autocomplete="given-name" maxlength="60">
+      <input type="tel" id="phone" placeholder="+375 (29) 123-45-67" autocomplete="tel" inputmode="tel" required>
+      <input type="text" class="hp" id="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <label><input type="checkbox" id="agree" required> <span>Даю согласие на обработку персональных данных в соответствии с <a href="privacy.html" target="_blank" rel="noopener">Политикой</a></span></label>
+      <p class="err" id="err"></p>
+      <button class="btn" type="submit" id="send">Жду звонка</button>
     </form>
     <div class="ok" id="ok">Спасибо! Менеджер позвонит в рабочее время, 09:00–20:00.</div>
-    <p class="legal">Не является лекарственным средством. Имеются противопоказания: при беременности, кормлении грудью и приёме лекарств посоветуйтесь с врачом. ООО «АппМед», УНП 791385072.</p>
+    <p class="legal">Не является лекарственным средством. Имеются противопоказания: при беременности, кормлении грудью и приёме лекарств посоветуйтесь с врачом. ООО «АппМед», УНП 791385072. <a href="privacy.html" target="_blank" rel="noopener">Политика обработки персональных данных</a></p>
   </section>
 </div>
 
 <script>
 var BOT = 'collagenby_bot';            // ← username бота без @
 var BH_START = 'c1795514778131-ds';         // ← код запуска воронки BotHelp (из ссылки Bro)
-var LEAD_WEBHOOK = '';                       // ← URL вебхука CRM/бота для заявки «перезвоните» (необязательно)
+// PIXEL_ID и WORKER_URL — в самом начале страницы, в <head>
 
 // ВАРИАНТЫ ШАПКИ для A/B-теста. Принудительно: ?h=a / ?h=b / ?h=c / ?h=d / ?h=e
 var HEADS = {
@@ -227,6 +270,7 @@ function go(n){
   window.scrollTo(0,0);
   if(cur===total) result();
   track('step_'+cur);
+  if(n===1 && !go.started){ go.started = true; px('ViewContent', {content_name:'quiz_start'}); }
 }
 document.querySelector('[data-next]').onclick = function(){ hist.push(0); go(1); };
 document.getElementById('back').onclick = function(){ if(hist.length) go(hist.pop()); };
@@ -293,17 +337,60 @@ function result(){
   document.getElementById('tg').href = 'https://r.bothelp.io/tg?domain=' + BOT + '&start=' + BH_START + '&campaign_code=' + payload;
 }
 
-document.getElementById('tg').addEventListener('click', function(){ track('tg_click'); });
+
+// что подобрали по ответу 4 — уходит в пиксель и в Битрикс
+function product(){
+  return ans.start==='f' ? {name:'Курс 1 кг', value:244} :
+         ans.start==='t' ? {name:'Банка 500 г со вкусом', value:170} :
+                           {name:'Нужен совет', value:0};
+}
+document.getElementById('tg').addEventListener('click', function(){
+  track('tg_click');
+  var pr = product();
+  px('Lead', {content_name: pr.name, value: pr.value, currency: 'BYN', lead_channel: 'telegram'});
+});
 document.getElementById('show-phone').onclick = function(){ document.getElementById('phone-form').classList.add('on'); document.getElementById('phone').focus(); };
+// белорусский номер: 9 цифр после 375 (или 80…)
+function normPhone(v){
+  var d = (v||'').replace(/\D/g,'');
+  if(d.indexOf('80')===0 && d.length===11) d = '375' + d.slice(2);
+  if(d.length===9) d = '375' + d;
+  return /^375(25|29|33|44|17|1[5-6]|2[1-3])\d{7}$/.test(d) ? '+' + d : '';
+}
 document.getElementById('phone-form').onsubmit = function(e){
   e.preventDefault();
-  var data = {phone: document.getElementById('phone').value, answers: ans, src: src};
-  if(LEAD_WEBHOOK){ try{ fetch(LEAD_WEBHOOK,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}); }catch(err){} }
-  track('phone_lead');
-  this.style.display='none'; document.getElementById('ok').style.display='block';
+  var form = this, err = document.getElementById('err'), btn = document.getElementById('send'),
+      ph = document.getElementById('phone'), phone = normPhone(ph.value);
+  function fail(msg){ err.textContent = msg; err.style.display = 'block'; }
+  err.style.display = 'none'; ph.classList.remove('bad');
+  if(!phone){ ph.classList.add('bad'); return fail('Проверьте номер: например, +375 29 123-45-67'); }
+  if(!document.getElementById('agree').checked) return fail('Отметьте согласие на обработку данных');
+  var pr = product();
+  var data = {
+    name: document.getElementById('name').value.trim().slice(0,60),
+    phone: phone,
+    answers: ans, product: pr.name, head: H,
+    utm: UTM, src: src, page: location.href.split('#')[0],
+    website: document.getElementById('hp').value   // ловушка для ботов, у людей пустая
+  };
+  function done(){
+    track('phone_lead');
+    px('Contact', {content_name: pr.name});
+    px('Lead', {content_name: pr.name, value: pr.value, currency: 'BYN', lead_channel: 'callback'});
+    form.style.display = 'none'; document.getElementById('ok').style.display = 'block';
+  }
+  if(!WORKER_URL){ done(); return; }  // интеграция ещё не подключена
+  btn.disabled = true; btn.textContent = 'Отправляем…';
+  fetch(WORKER_URL, {method:'POST', headers:{'Content-Type':'text/plain'}, body: JSON.stringify(data)})
+    .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ if(!r.ok || !j.ok) throw 0; }); })
+    .then(done)
+    .catch(function(){
+      btn.disabled = false; btn.textContent = 'Жду звонка';
+      fail('Не получилось отправить. Попробуйте ещё раз или напишите нам в Telegram — кнопка выше.');
+    });
 };
 
-// аналитика: подключите Яндекс Метрику / Meta Pixel и вызывайте их здесь
+// аналитика: свои события (шаги квиза) для Яндекс Метрики и Meta; стандартные события Meta — через px()
 function track(ev){
   ev = ev + '_h' + H; // вариант шапки в каждом событии
   try{ if(window.ym && window.YM_ID) ym(window.YM_ID,'reachGoal',ev); }catch(e){}
