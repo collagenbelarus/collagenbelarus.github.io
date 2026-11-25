@@ -349,6 +349,8 @@ document.getElementById('tg').addEventListener('click', function(){
   var pr = product();
   px('Lead', {content_name: pr.name, value: pr.value, currency: 'BYN', lead_channel: 'telegram'});
 });
+// пока Битрикс не подключён (WORKER_URL пуст), прячем «Перезвоните мне»: иначе номер никуда не уйдёт
+if(!WORKER_URL){ document.querySelector('.alt').style.display='none'; document.getElementById('phone-form').style.display='none'; }
 document.getElementById('show-phone').onclick = function(){ document.getElementById('phone-form').classList.add('on'); document.getElementById('phone').focus(); };
 // белорусский номер: 9 цифр после 375 (или 80…)
 function normPhone(v){
